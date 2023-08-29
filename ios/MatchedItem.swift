@@ -2,6 +2,8 @@ import ExpoModulesCore
 
 internal struct MatchedItem: Record {
     @Field
+    var isrc: String? = nil
+    @Field
     var title: String? = nil
     @Field
     var artist: String? = nil
