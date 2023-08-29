@@ -3,6 +3,10 @@
  */
 export type MatchedItem = {
   /**
+   * ISRC for the media item.
+   */
+  isrc?: string;
+  /**
    * A title for the media item.
    */
   title?: string;
