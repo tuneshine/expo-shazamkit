@@ -7,7 +7,7 @@ public class ShazamKitModule: Module, ResultHandler {
 
   private let audioEngine = AVAudioEngine()
   private let mixerNode = AVAudioMixerNode()
-  
+
   private var pendingPromise: Promise?
 
   private var latestResults = [SHMediaItem]()
@@ -20,7 +20,7 @@ public class ShazamKitModule: Module, ResultHandler {
       session.delegate = delegate
       configureAudioEngine()
     }
-    
+
     Function("isAvailable") {
       return true
     }
@@ -61,18 +61,20 @@ public class ShazamKitModule: Module, ResultHandler {
       stopListening()
     }
   }
-  
+
   func didFind(match: SHMatch) {
     guard let promise = pendingPromise else {
       log.error("Shazam module: promise has been lost")
       stopListening()
       return
     }
-    
+
     stopListening()
+    print(match.mediaItems[0])
 
     let items = match.mediaItems.map { item in
       MatchedItem(
+        isrc: item.isrc,
         title: item.title,
         artist: item.artist,
         shazamID: item.shazamID,
@@ -97,7 +99,7 @@ public class ShazamKitModule: Module, ResultHandler {
       log.error("ExpoShazamKit: promise has been lost")
       return
     }
-    
+
     promise.reject(NoMatchException())
     stopListening()
   }
@@ -106,7 +108,7 @@ public class ShazamKitModule: Module, ResultHandler {
     guard !audioEngine.isRunning else { return }
     let audioSession = AVAudioSession.sharedInstance()
     try audioSession.setCategory(.playAndRecord)
-    
+
     audioSession.requestRecordPermission { [weak self] success in
       guard success, let self else { return }
       do {
