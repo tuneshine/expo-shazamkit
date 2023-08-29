@@ -70,7 +70,6 @@ public class ShazamKitModule: Module, ResultHandler {
     }
 
     stopListening()
-    print(match.mediaItems[0])
 
     let items = match.mediaItems.map { item in
       MatchedItem(
