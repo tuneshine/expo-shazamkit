@@ -36,6 +36,7 @@ public class ShazamKitModule: Module, ResultHandler {
         guard success, let self else { return }
         if !isConfigurationCreated {
             configureAudioEngine()
+            isConfigurationCreated = true
         }
         do {
           try self.audioEngine.start()
