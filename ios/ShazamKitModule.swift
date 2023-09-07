@@ -18,7 +18,6 @@ public class ShazamKitModule: Module, ResultHandler {
     OnCreate {
       delegate = ShazamDelegate(resultHandler: self)
       session.delegate = delegate
-      configureAudioEngine()
     }
 
     Function("isAvailable") {
@@ -32,7 +31,7 @@ public class ShazamKitModule: Module, ResultHandler {
       }
 
       pendingPromise = promise
-
+      configureAudioEngine()
       do {
         try findMatch()
       } catch {
