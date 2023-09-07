@@ -11,6 +11,7 @@ public class ShazamKitModule: Module, ResultHandler {
   private var pendingPromise: Promise?
 
   private var latestResults = [SHMediaItem]()
+  private var isConfigurationCreated = false
 
   public func definition() -> ModuleDefinition {
     Name("ExpoShazamKit")
@@ -31,12 +32,17 @@ public class ShazamKitModule: Module, ResultHandler {
       }
 
       pendingPromise = promise
-      configureAudioEngine()
-      do {
-        try findMatch()
-      } catch {
-        promise.reject(error)
-        pendingPromise = nil
+      audioSession.requestRecordPermission { [weak self] success in
+        guard success, let self else { return }
+        if !isConfigurationCreated {
+            configureAudioEngine()
+        }
+        do {
+          try self.audioEngine.start()
+        } catch {
+          self.pendingPromise?.reject(FailedToStartAudioEngine())
+          self.pendingPromise = nil
+        }
       }
     }
 
