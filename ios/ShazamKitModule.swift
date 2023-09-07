@@ -107,30 +107,11 @@ public class ShazamKitModule: Module, ResultHandler {
     guard !audioEngine.isRunning else { return }
     let audioSession = AVAudioSession.sharedInstance()
     try audioSession.setCategory(.playAndRecord)
-    var audioPermission = ""
-      switch AVAudioSession.sharedInstance().recordPermission {
-          case .granted:
-          audioPermission = "granted"
-          case .denied:
-            audioPermission = "denied"
-          case .undetermined:
-              AVAudioSession.sharedInstance().requestRecordPermission({ granted in
-                  // Handle granted
-                  audioPermission = "granted"
-              })
-          @unknown default:
-              audioPermission = "denied"
-          }
-
-      if audioPermission == "granted" {
-          do {
-            try self.audioEngine.start()
-          } catch {
-            self.pendingPromise?.reject(FailedToStartAudioEngine())
-            self.pendingPromise = nil
-          }
-      } else {
-          self.pendingPromise?.reject(FailedToStartAudioEngine())
+    do {
+        try self.audioEngine.start()
+      } catch {
+        self.pendingPromise?.reject(FailedToStartAudioEngine())
+        self.pendingPromise = nil
       }
   }
 

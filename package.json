@@ -24,13 +24,13 @@
     "music",
     "ios"
   ],
-  "repository": "https://github.com/alanjhughes/expo-shazamkit",
+  "repository": "https://github.com/ibrahimtuna/expo-shazamkit",
   "bugs": {
-    "url": "https://github.com/alanjhughes/expo-shazamkit/issues"
+    "url": "https://github.com/ibrahimtuna/expo-shazamkit/issues"
   },
-  "author": "Alan Hughes <hughesno1@gmail.com> (https://github.com/alanjhughes)",
+  "author": "İbrahim Tuna <h.ibrahim.tuna@gmail.com> (https://github.com/ibrahimtuna) forked from alanjhughes",
   "license": "MIT",
-  "homepage": "https://github.com/alanjhughes/expo-shazamkit#readme",
+  "homepage": "https://github.com/ibrahimtuna/expo-shazamkit#readme",
   "dependencies": {},
   "devDependencies": {
     "@types/react": "^18.0.25",
