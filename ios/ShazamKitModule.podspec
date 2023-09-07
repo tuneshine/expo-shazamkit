@@ -12,7 +12,7 @@ Pod::Spec.new do |s|
   s.homepage       = package['homepage']
   s.platform       = :ios, '15.0'
   s.swift_version  = '5.4'
-  s.source         = { git: 'https://github.com/alanjhughes/expo-shazamkit' }
+  s.source         = { git: 'https://github.com/ibrahimtuna/expo-shazamkit' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
@@ -22,6 +22,6 @@ Pod::Spec.new do |s|
     'DEFINES_MODULE' => 'YES',
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
-  
+
   s.source_files = "**/*.{h,m,swift}"
 end
