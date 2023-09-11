@@ -5,9 +5,13 @@ export default NativeModulesProxy.ExpoShazamKit || {
     return false;
   },
 
-  startListening() {},
+  async startListening() {
+    return false;
+  },
 
-  stopListening() {},
+  stopListening() {
+    return false;
+  },
 
   addToShazamLibrary() {
     return { success: false };
