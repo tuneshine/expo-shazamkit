@@ -5,6 +5,8 @@ import expo.modules.kotlin.records.Record
 
 data class MatchedItem(
     @Field
+    var isrc: String?,
+    @Field
     var title: String?,
     @Field
     var artist: String?,

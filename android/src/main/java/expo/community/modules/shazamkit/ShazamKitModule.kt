@@ -43,6 +43,7 @@ class ShazamKitModule : Module() {
                                is MatchResult.Match -> {
                                    val results = result.matchedMediaItems.map {
                                         MatchedItem(
+                                            isrc = it.isrc,
                                             title = it.title,
                                             artist = it.artist,
                                             shazamID = it.shazamID,
