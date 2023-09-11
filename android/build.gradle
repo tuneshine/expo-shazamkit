@@ -88,7 +88,7 @@ repositories {
 dependencies {
   implementation project(':expo-modules-core')
   implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:${getKotlinVersion()}"
-  implementation(name: "shazamkit-android-release", ext: "aar")
+  implementation(files("src/main/libs/shazamkit-android-release.aar"))
   implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.1'
   implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.4.1'
   implementation 'com.squareup.okhttp3:okhttp:4.9.0'
