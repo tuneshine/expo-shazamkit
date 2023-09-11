@@ -1,0 +1,8 @@
+package expo.community.modules.shazamkit
+
+import com.shazam.shazamkit.DeveloperToken
+import com.shazam.shazamkit.DeveloperTokenProvider
+
+class ShazamDeveloperTokenProvider : DeveloperTokenProvider {
+    override fun provideDeveloperToken() = DeveloperToken(token = "eyJraWQiOiJEVk4zUzhROE1aIiwidHlwIjoiSldUIiwiYWxnIjoiRVMyNTYifQ.eyJhdWQiOiJhcHBzdG9yZWNvbm5lY3QtdjEiLCJpc3MiOiJITVg4OFFTMkFSIiwiZXhwIjoxNzA3Mzg3MzI3LCJpYXQiOjE2OTE2MTEzMjd9.w1_EVvnxIfenFP-D8LG1V8EP608hiBISgi5BbkLWctCAxGQOqDXmdaayA7nRX45WvmEJYbWyYK_80hmnYhE7SA")
+}
