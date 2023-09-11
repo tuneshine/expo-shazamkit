@@ -25,10 +25,6 @@ class ShazamKitModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("ExpoShazamKit")
 
-        Function("isAvailable") {
-            return true
-        }
-
         AsyncFunction("startListening") Coroutine { promise: Promise ->
             val catalog = ShazamKit.createShazamCatalog(ShazamDeveloperTokenProvider(), locale = Locale.getDefault())
 
