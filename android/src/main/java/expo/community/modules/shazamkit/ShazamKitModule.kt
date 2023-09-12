@@ -27,6 +27,7 @@ class ShazamKitModule : Module() {
 
         AsyncFunction("startListening") Coroutine { promise: Promise ->
             val catalog = ShazamKit.createShazamCatalog(ShazamDeveloperTokenProvider(), locale = Locale.getDefault())
+            Log.d("catalog", "Start Listening")
 
             when (val session = ShazamKit.createStreamingSession(catalog = catalog, AudioSampleRateInHz.SAMPLE_RATE_16000, DEFAULT_BUFFER_SIZE)) {
                 is ShazamKitResult.Success -> {
