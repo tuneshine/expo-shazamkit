@@ -5,13 +5,9 @@ export default NativeModulesProxy.ExpoShazamKit || {
     return false;
   },
 
-  startListening() {
-    return new Promise(resolve => resolve(false))
-  },
+  startListening() {},
 
-  stopListening() {
-    return new Promise(resolve => resolve(false))
-  },
+  stopListening() {},
 
   addToShazamLibrary() {
     return { success: false };
