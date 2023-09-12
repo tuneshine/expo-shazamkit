@@ -24,57 +24,8 @@ class ShazamKitModule : Module() {
 
     override fun definition() = ModuleDefinition {
         Name("ExpoShazamKit")
-
-        AsyncFunction("startListening") Coroutine { promise: Promise ->
-            val catalog = ShazamKit.createShazamCatalog(ShazamDeveloperTokenProvider(), locale = Locale.getDefault())
-            Log.d("catalog", "Start Listening")
-
-            when (val session = ShazamKit.createStreamingSession(catalog = catalog, AudioSampleRateInHz.SAMPLE_RATE_16000, DEFAULT_BUFFER_SIZE)) {
-                is ShazamKitResult.Success -> {
-                    if (ActivityCompat.checkSelfPermission(
-                            context,
-                            Manifest.permission.RECORD_AUDIO
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        promise.resolve(null)
-                    } else {
-                        session.data.matchStream(simpleMicRecording(catalog), Int.SIZE_BYTES, 12000)
-                        session.data.recognitionResults().collect { result ->
-                           when(result) {
-                               is MatchResult.Match -> {
-                                   val results = result.matchedMediaItems.map {
-                                        MatchedItem(
-                                            isrc = it.isrc,
-                                            title = it.title,
-                                            artist = it.artist,
-                                            shazamID = it.shazamID,
-                                            appleMusicID = it.appleMusicID,
-                                            appleMusicURL = it.appleMusicURL?.toString().orEmpty(),
-                                            artworkURL = it.artworkURL?.toString().orEmpty(),
-                                            genres = it.genres,
-                                            webURL = it.webURL?.toString().orEmpty(),
-                                            subtitle = it.subtitle,
-                                            videoURL = it.videoURL?.toString().orEmpty(),
-                                            explicitContent = it.explicitContent ?: false,
-                                            matchOffset = it.matchOffsetInMs?.toDouble() ?: 0.0
-                                        )
-                                   }
-                                   promise.resolve(results)
-                               }
-                               is MatchResult.NoMatch -> {
-                                    promise.reject(NoMatchException())
-                               }
-                               is MatchResult.Error -> {
-                                    promise.reject("MatchResult Error", result.exception.message, result.exception.cause)
-                               }
-                           }
-                        }
-                    }
-                }
-                is ShazamKitResult.Failure -> {
-                    promise.reject("Shazam Error", "Failed to start recording", session.reason)
-                }
-            }
+        AsyncFunction("startListening") {
+            promise.resolve(true)
         }
 
         Function("stopListening") {
