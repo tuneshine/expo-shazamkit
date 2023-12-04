@@ -31,7 +31,10 @@
   "author": "İbrahim Tuna <h.ibrahim.tuna@gmail.com> (https://github.com/ibrahimtuna) forked from alanjhughes",
   "license": "MIT",
   "homepage": "https://github.com/ibrahimtuna/expo-shazamkit#readme",
-  "dependencies": {},
+  "dependencies": {
+    "expo-modules-core": "^1.1.0",
+    "expo-module-scripts": "^3.0.4"
+  },
   "devDependencies": {
     "@types/react": "^18.0.25",
     "@types/react-native": "^0.70.6",
