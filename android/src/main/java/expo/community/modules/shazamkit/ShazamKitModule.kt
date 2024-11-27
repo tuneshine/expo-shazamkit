@@ -114,6 +114,10 @@ class ShazamKitModule : Module() {
         catalog = ShazamKit.createShazamCatalog(tokenProvider)
 
 
+        Function("isAvailable") {
+            true
+        }
+
         AsyncFunction("startListening") { promise: Promise ->
             job = CoroutineScope(Dispatchers.Unconfined).launch {
                 shazamStarter(promise)
@@ -180,69 +184,8 @@ class ShazamKitModule : Module() {
     private fun onError(message: String) {
         Log.d("ShazamError", message.toString())
     }
+
+    fun isAvailable(): Boolean {
+        return true
+    }
 }
-
-
-
-
-
-
-
-
-
-/*
-
-        suspend fun shazamStarter () {
-
-            when (val result = ShazamKit.createStreamingSession(
-                catalog,
-                AudioSampleRateInHz.SAMPLE_RATE_44100,
-                8192
-            )) {
-                is ShazamKitResult.Success -> {
-                    currentSession = result.data
-
-                }
-                is ShazamKitResult.Failure -> {
-                    result.reason.message?.let { onError(it) }
-                }
-            }
-            currentSession?.let {
-                currentSession?.recognitionResults()?.collect { result: MatchResult ->
-                    try{
-                        when (result) {
-                            is MatchResult.Match -> {
-                                val results = result.matchedMediaItems.map {
-                                    MatchedItem(
-                                        isrc = it.isrc,
-                                        title = it.title,
-                                        artist = it.artist,
-                                        shazamID = it.shazamID,
-                                        appleMusicID = it.appleMusicID,
-                                        appleMusicURL = it.appleMusicURL?.toString().orEmpty(),
-                                        artworkURL = it.artworkURL?.toString().orEmpty(),
-                                        genres = it.genres,
-                                        webURL = it.webURL?.toString().orEmpty(),
-                                        subtitle = it.subtitle,
-                                        videoURL = it.videoURL?.toString().orEmpty(),
-                                        explicitContent = it.explicitContent ?: false,
-                                        matchOffset = it.matchOffsetInMs?.toDouble() ?: 0.0
-                                    )
-                                }
-                                android.util.Log.d("ShazamResult", results.toString())
-                            }
-                            is MatchResult.NoMatch -> {
-                                android.util.Log.d("ShazamResult", "NoMatch")
-                            }
-                            is MatchResult.Error -> {
-                                android.util.Log.d("ShazamResult", result.exception.message.toString())
-                            }
-                        }
-                    }catch (e: Exception){
-                        e.message?.let { onError(it) }
-                    }
-                }
-            }
-
-        }
- */
