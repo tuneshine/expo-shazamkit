@@ -36,72 +36,85 @@ class ShazamKitModule : Module() {
     private var isRecording = false
     var job: Job? = null
 
-    suspend fun shazamStarter (promise: Promise) {
-        android.util.Log.d("ShazamResult", "HERE")
+    private fun checkPermission(): Boolean {
+        return ActivityCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+    }
 
-        when (val result = ShazamKit.createStreamingSession(
-            catalog,
-            AudioSampleRateInHz.SAMPLE_RATE_48000,
-            8192
-        )) {
-            is ShazamKitResult.Success -> {
-                android.util.Log.d("ShazamResult", "SUCCESS")
-                currentSession = result.data
-                CoroutineScope(Dispatchers.Unconfined).launch {
-                    startListening(promise)
-                }
-            }
-            is ShazamKitResult.Failure -> {
-                android.util.Log.d("ShazamResult", "FAILED")
-                result.reason.message?.let { onError(it) }
-            }
-        }
-        currentSession?.let {
-            currentSession?.recognitionResults()?.collect { result: MatchResult ->
-                android.util.Log.d("ShazamResult", "FIRST LINE")
-                try{
-                    when (result) {
-                        is MatchResult.Match -> {
-                            android.util.Log.d("ShazamResult", "MATCH")
-                            val results = result.matchedMediaItems.map {
-                                MatchedItem(
-                                    isrc = it.isrc,
-                                    title = it.title,
-                                    artist = it.artist,
-                                    shazamID = it.shazamID,
-                                    appleMusicID = it.appleMusicID,
-                                    appleMusicURL = it.appleMusicURL?.toString().orEmpty(),
-                                    artworkURL = it.artworkURL?.toString().orEmpty(),
-                                    genres = it.genres,
-                                    webURL = it.webURL?.toString().orEmpty(),
-                                    subtitle = it.subtitle,
-                                    videoURL = it.videoURL?.toString().orEmpty(),
-                                    explicitContent = it.explicitContent ?: false,
-                                    matchOffset = it.matchOffsetInMs?.toDouble() ?: 0.0
-                                )
-                            }
-                            android.util.Log.d("ShazamResult", results.toString())
-                            promise.resolve(results)
-                            stopShazamListening(promise)
-                        }
-                        is MatchResult.NoMatch -> {
-                            android.util.Log.d("ShazamResult", "NoMatch")
-                            promise.reject(NoMatchException())
-                            stopShazamListening(promise)
-                        }
-                        is MatchResult.Error -> {
-                            android.util.Log.d("ShazamResult", result.exception.message.toString())
-                            promise.reject("MatchResult Error", result.exception.message, result.exception.cause)
-                            stopShazamListening(promise)
-                        }
+    suspend fun shazamStarter(promise: Promise) {
+        try {
+            android.util.Log.d("ShazamResult", "Starting Shazam session")
+
+            when (val result = ShazamKit.createStreamingSession(
+                catalog,
+                AudioSampleRateInHz.SAMPLE_RATE_48000,
+                8192
+            )) {
+                is ShazamKitResult.Success -> {
+                    android.util.Log.d("ShazamResult", "Session created successfully")
+                    currentSession = result.data
+                    CoroutineScope(Dispatchers.IO).launch {
+                        startListening(promise)
                     }
-                }catch (e: Exception){
-                    e.message?.let { onError(it) }
-                    stopShazamListening(promise)
+                }
+                is ShazamKitResult.Failure -> {
+                    val errorMessage = result.reason.message ?: "Unknown error creating session"
+                    android.util.Log.e("ShazamResult", "Failed to create session: $errorMessage")
+                    promise.reject("SESSION_ERROR", errorMessage)
                 }
             }
-        }
+            currentSession?.let {
+                currentSession?.recognitionResults()?.collect { result: MatchResult ->
+                    android.util.Log.d("ShazamResult", "FIRST LINE")
+                    try{
+                        when (result) {
+                            is MatchResult.Match -> {
+                                android.util.Log.d("ShazamResult", "MATCH")
+                                val results = result.matchedMediaItems.map {
+                                    MatchedItem(
+                                        isrc = it.isrc,
+                                        title = it.title,
+                                        artist = it.artist,
+                                        shazamID = it.shazamID,
+                                        appleMusicID = it.appleMusicID,
+                                        appleMusicURL = it.appleMusicURL?.toString().orEmpty(),
+                                        artworkURL = it.artworkURL?.toString().orEmpty(),
+                                        genres = it.genres,
+                                        webURL = it.webURL?.toString().orEmpty(),
+                                        subtitle = it.subtitle,
+                                        videoURL = it.videoURL?.toString().orEmpty(),
+                                        explicitContent = it.explicitContent ?: false,
+                                        matchOffset = it.matchOffsetInMs?.toDouble() ?: 0.0
+                                    )
+                                }
+                                android.util.Log.d("ShazamResult", results.toString())
+                                promise.resolve(results)
+                                stopShazamListening(promise)
+                            }
+                            is MatchResult.NoMatch -> {
+                                android.util.Log.d("ShazamResult", "NoMatch")
+                                promise.reject(NoMatchException())
+                                stopShazamListening(promise)
+                            }
+                            is MatchResult.Error -> {
+                                android.util.Log.d("ShazamResult", result.exception.message.toString())
+                                promise.reject("MatchResult Error", result.exception.message, result.exception.cause)
+                                stopShazamListening(promise)
+                            }
+                        }
+                    }catch (e: Exception){
+                        e.message?.let { onError(it) }
+                        stopShazamListening(promise)
+                    }
+                }
+            }
 
+        } catch (e: Exception) {
+            android.util.Log.e("ShazamResult", "Error in shazamStarter: ${e.message}", e)
+            promise.reject("SHAZAM_ERROR", e.message, e)
+        }
     }
 
     override fun definition() = ModuleDefinition {
@@ -119,6 +132,11 @@ class ShazamKitModule : Module() {
         }
 
         AsyncFunction("startListening") { promise: Promise ->
+            if (!checkPermission()) {
+                promise.reject("ERR_PERMISSION", "Recording permission not granted")
+                return@AsyncFunction
+            }
+            
             job = CoroutineScope(Dispatchers.Unconfined).launch {
                 shazamStarter(promise)
             }

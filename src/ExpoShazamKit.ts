@@ -2,7 +2,7 @@ import { NativeModulesProxy } from "expo-modules-core";
 
 export default NativeModulesProxy.ExpoShazamKit || {
   isAvailable(): boolean {
-    return false;
+    return true;
   },
 
   startListening() {},
