@@ -59,12 +59,25 @@ afterEvaluate {
 }
 
 android {
-  compileSdkVersion safeExtGet('compileSdkVersion', 27)
-  buildToolsVersion safeExtGet('buildToolsVersion', '27.0.3')
+  compileSdkVersion safeExtGet("compileSdkVersion", 31)
+
+  compileOptions {
+      sourceCompatibility = JavaVersion.VERSION_17
+      targetCompatibility = JavaVersion.VERSION_17
+  }
+  kotlinOptions {
+      jvmTarget = "17"
+  }
+
+  kotlinOptions {
+    jvmTarget = JavaVersion.VERSION_17.majorVersion
+  }
 
   defaultConfig {
-    minSdkVersion 18
-    targetSdkVersion safeExtGet('targetSdkVersion', 27)
+    minSdkVersion safeExtGet("minSdkVersion", 24)
+    targetSdkVersion safeExtGet("targetSdkVersion", 31)
+    versionCode 1
+    versionName "0.1.12"
   }
   lintOptions {
     abortOnError false
