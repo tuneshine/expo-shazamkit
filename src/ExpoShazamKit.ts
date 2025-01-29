@@ -1,6 +1,6 @@
 import { NativeModulesProxy } from "expo-modules-core";
 
-const ShazamKitNative = NativeModulesProxy.ExpoShazamKit || {
+export default NativeModulesProxy.ExpoShazamKit || {
   isAvailable(): boolean {
     return true;
   },
@@ -16,12 +16,3 @@ const ShazamKitNative = NativeModulesProxy.ExpoShazamKit || {
   removeListeners() {},
 };
 
-// Export your JS module as usual:
-export default {
-  ...ShazamKitNative,
-
-  // Provide a convenient JS method to set the token
-  setDeveloperToken(token: string) {
-    return ShazamKitNative.setDeveloperToken?.(token);
-  },
-};

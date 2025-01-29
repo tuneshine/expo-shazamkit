@@ -2,10 +2,10 @@ import {
   ConfigPlugin,
   createRunOncePlugin,
   withInfoPlist,
-  withAndroidStringsXml,
+  withStringsXml,
 } from "@expo/config-plugins";
 
-const pkg = require("expo-shazamkit/package.json");
+const pkg = require("../../package.json");
 
 const MICROPHONE_USAGE = "Allow $(PRODUCT_NAME) to access your microphone";
 
@@ -29,7 +29,7 @@ const withShazamKit: ConfigPlugin<ShazamKitPluginProps> = (
 
   // Write the developerToken to Android strings.xml
   if (developerToken) {
-    config = withAndroidStringsXml(config, (config) => {
+    config = withStringsXml(config, (config) => {
       if (!config.modResults.resources) {
         config.modResults.resources = {};
       }
