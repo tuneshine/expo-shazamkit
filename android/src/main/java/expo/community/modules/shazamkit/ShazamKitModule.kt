@@ -47,7 +47,7 @@ class ShazamKitModule : Module() {
 
     AsyncFunction("startListening") { promise: Promise ->
       if (!checkPermission()) {
-        promise.reject("ERR_PERMISSION", "Recording permission not granted")
+        promise.reject("ERR_PERMISSION", "Recording permission not granted", null)
         return@AsyncFunction
       }
 
@@ -74,7 +74,7 @@ class ShazamKitModule : Module() {
     try {
       if (!this::catalog.isInitialized) {
         // If catalog not set, we have no token
-        promise.reject("TOKEN_ERROR", "No developer token has been set")
+        promise.reject("TOKEN_ERROR", "No developer token has been set", null)
         return
       }
 
