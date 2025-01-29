@@ -7,51 +7,40 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
 import androidx.annotation.RequiresPermission
-import androidx.annotation.WorkerThread
 import androidx.core.app.ActivityCompat
 import com.shazam.shazamkit.*
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.Exceptions
-import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
-import java.nio.ByteBuffer
-import java.util.*
 import kotlinx.coroutines.*
-import android.os.Process.*
-import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
-import java.lang.Exception
-
 
 class ShazamKitModule : Module() {
-  private val context
+  // Grab a standard Android Context from the Expo app context.
+  private val androidContext
     get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
 
-  // Keep track of the current dev token, initially empty or from your plugin config if you want.
   private var currentDeveloperToken: String? = null
-
   private lateinit var catalog: Catalog
   private var currentSession: StreamingSession? = null
   private var audioRecord: AudioRecord? = null
   private var recordingThread: Thread? = null
   private var isRecording = false
-  var job: Job? = null
+  private var job: Job? = null
 
   override fun definition() = ModuleDefinition {
     Name("ExpoShazamKit")
 
-    // This function allows JS to provide a new token at runtime
+    // Dynamically set the token from JavaScript
     Function("setDeveloperToken") { token: String ->
       currentDeveloperToken = token
-      // Re-initialize or update ShazamKit with the new token
-      // Inside ShazamKitModule.kt
-      val tokenProvider = ShazamDeveloperTokenProvider(appContext.context!!)
+      // Re-initialize ShazamKit with a new DeveloperTokenProvider
+      val tokenProvider = DeveloperTokenProvider {
+        DeveloperToken(token)
+      }
       catalog = ShazamKit.createShazamCatalog(tokenProvider)
     }
 
-    // Example function to check availability
     Function("isAvailable") {
       true
     }
@@ -68,27 +57,27 @@ class ShazamKitModule : Module() {
     }
 
     AsyncFunction("stopListening") { promise: Promise ->
-      Log.d("Shazam", "Stoplistening called from react native")
+      Log.d("Shazam", "stopListening called from react native")
       stopShazamListening(promise)
     }
   }
 
   private fun checkPermission(): Boolean {
     return ActivityCompat.checkSelfPermission(
-      context,
+      androidContext,
       Manifest.permission.RECORD_AUDIO
     ) == PackageManager.PERMISSION_GRANTED
   }
 
+  @Suppress("TooGenericExceptionCaught")
   suspend fun shazamStarter(promise: Promise) {
     try {
       if (!this::catalog.isInitialized) {
-        // If no token set yet, reject or handle gracefully
+        // If catalog not set, we have no token
         promise.reject("TOKEN_ERROR", "No developer token has been set")
         return
       }
 
-      // Create session from catalog
       when (val result = ShazamKit.createStreamingSession(
         catalog,
         AudioSampleRateInHz.SAMPLE_RATE_48000,
@@ -101,18 +90,17 @@ class ShazamKitModule : Module() {
           }
         }
         is ShazamKitResult.Failure -> {
-          promise.reject("SESSION_ERROR", result.reason.message ?: "Unknown error")
+          // Reject with code + message + cause
+          promise.reject("SESSION_ERROR", result.reason.message, result.reason)
         }
       }
 
-      // Collect match results, etc.
       currentSession?.let { session ->
-        session.recognitionResults().collect { result: MatchResult ->
-          try{
-            when (result) {
+        session.recognitionResults().collect { matchResult ->
+          try {
+            when (matchResult) {
               is MatchResult.Match -> {
-                android.util.Log.d("ShazamResult", "MATCH")
-                val results = result.matchedMediaItems.map {
+                val results = matchResult.matchedMediaItems.map {
                   MatchedItem(
                     isrc = it.isrc,
                     title = it.title,
@@ -129,23 +117,25 @@ class ShazamKitModule : Module() {
                     matchOffset = it.matchOffsetInMs?.toDouble() ?: 0.0
                   )
                 }
-                android.util.Log.d("ShazamResult", results.toString())
                 promise.resolve(results)
                 stopShazamListening(promise)
               }
               is MatchResult.NoMatch -> {
-                android.util.Log.d("ShazamResult", "NoMatch")
+                // If you have NoMatchException : CodedException
                 promise.reject(NoMatchException())
                 stopShazamListening(promise)
               }
               is MatchResult.Error -> {
-                android.util.Log.d("ShazamResult", result.exception.message.toString())
-                promise.reject("MATCH_RESULT_ERROR", result.exception.message.orEmpty(), result.exception)
+                promise.reject(
+                  "MATCH_RESULT_ERROR",
+                  matchResult.exception.message ?: "Unknown error",
+                  matchResult.exception
+                )
                 stopShazamListening(promise)
               }
             }
-          }catch (e: Exception){
-            e.message?.let { onError(it) }
+          } catch (e: Exception) {
+            onError(e.message.orEmpty())
             stopShazamListening(promise)
           }
         }
@@ -187,7 +177,7 @@ class ShazamKitModule : Module() {
       }, "AudioRecorder Thread")
       recordingThread!!.start()
     } catch (e: Exception) {
-      promise.reject("START_LISTENING_ERROR", e.message.orEmpty(), e)
+      promise.reject("START_LISTENING_ERROR", e.message, e)
     }
   }
 
