@@ -1,13 +1,14 @@
+// ShazamDeveloperTokenProvider.kt
 package expo.community.modules.shazamkit
 
+import android.content.Context
 import com.shazam.shazamkit.DeveloperToken
 import com.shazam.shazamkit.DeveloperTokenProvider
 import expo.community.modules.shazamkit.R
-import com.facebook.react.bridge.ReactApplicationContext
 
-class ShazamDeveloperTokenProvider(private val reactContext: ReactApplicationContext) : DeveloperTokenProvider {
-    override fun provideDeveloperToken(): DeveloperToken {
-        val token = reactContext.getString(R.string.shazam_developer_token)
-        return DeveloperToken(token)
-    }
+class ShazamDeveloperTokenProvider(private val context: Context) : DeveloperTokenProvider {
+  override fun provideDeveloperToken(): DeveloperToken {
+    val token = context.getString(R.string.shazam_developer_token)
+    return DeveloperToken(token)
+  }
 }

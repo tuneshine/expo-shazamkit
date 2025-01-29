@@ -46,9 +46,8 @@ class ShazamKitModule : Module() {
     Function("setDeveloperToken") { token: String ->
       currentDeveloperToken = token
       // Re-initialize or update ShazamKit with the new token
-      val tokenProvider = DeveloperTokenProvider {
-        DeveloperToken(token)
-      }
+      // Inside ShazamKitModule.kt
+      val tokenProvider = ShazamDeveloperTokenProvider(appContext.context!!)
       catalog = ShazamKit.createShazamCatalog(tokenProvider)
     }
 
@@ -141,7 +140,7 @@ class ShazamKitModule : Module() {
               }
               is MatchResult.Error -> {
                 android.util.Log.d("ShazamResult", result.exception.message.toString())
-                promise.reject("MatchResult Error", result.exception.message, result.exception.cause)
+                promise.reject("MATCH_RESULT_ERROR", result.exception.message.orEmpty(), result.exception)
                 stopShazamListening(promise)
               }
             }
@@ -188,7 +187,7 @@ class ShazamKitModule : Module() {
       }, "AudioRecorder Thread")
       recordingThread!!.start()
     } catch (e: Exception) {
-      promise.reject("START_LISTENING_ERROR", e.message, e)
+      promise.reject("START_LISTENING_ERROR", e.message.orEmpty(), e)
     }
   }
 
