@@ -29,12 +29,50 @@ class ShazamKitModule : Module() {
   private val context
     get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
 
+  // Keep track of the current dev token, initially empty or from your plugin config if you want.
+  private var currentDeveloperToken: String? = null
+
   private lateinit var catalog: Catalog
   private var currentSession: StreamingSession? = null
   private var audioRecord: AudioRecord? = null
   private var recordingThread: Thread? = null
   private var isRecording = false
   var job: Job? = null
+
+  override fun definition() = ModuleDefinition {
+    Name("ExpoShazamKit")
+
+    // This function allows JS to provide a new token at runtime
+    Function("setDeveloperToken") { token: String ->
+      currentDeveloperToken = token
+      // Re-initialize or update ShazamKit with the new token
+      val tokenProvider = DeveloperTokenProvider {
+        DeveloperToken(token)
+      }
+      catalog = ShazamKit.createShazamCatalog(tokenProvider)
+    }
+
+    // Example function to check availability
+    Function("isAvailable") {
+      true
+    }
+
+    AsyncFunction("startListening") { promise: Promise ->
+      if (!checkPermission()) {
+        promise.reject("ERR_PERMISSION", "Recording permission not granted")
+        return@AsyncFunction
+      }
+
+      job = CoroutineScope(Dispatchers.Unconfined).launch {
+        shazamStarter(promise)
+      }
+    }
+
+    AsyncFunction("stopListening") { promise: Promise ->
+      Log.d("Shazam", "Stoplistening called from react native")
+      stopShazamListening(promise)
+    }
+  }
 
   private fun checkPermission(): Boolean {
     return ActivityCompat.checkSelfPermission(
@@ -45,29 +83,32 @@ class ShazamKitModule : Module() {
 
   suspend fun shazamStarter(promise: Promise) {
     try {
-      android.util.Log.d("ShazamResult", "Starting Shazam session")
+      if (!this::catalog.isInitialized) {
+        // If no token set yet, reject or handle gracefully
+        promise.reject("TOKEN_ERROR", "No developer token has been set")
+        return
+      }
 
+      // Create session from catalog
       when (val result = ShazamKit.createStreamingSession(
         catalog,
         AudioSampleRateInHz.SAMPLE_RATE_48000,
         8192
       )) {
         is ShazamKitResult.Success -> {
-          android.util.Log.d("ShazamResult", "Session created successfully")
           currentSession = result.data
           CoroutineScope(Dispatchers.IO).launch {
             startListening(promise)
           }
         }
         is ShazamKitResult.Failure -> {
-          val errorMessage = result.reason.message ?: "Unknown error creating session"
-          android.util.Log.e("ShazamResult", "Failed to create session: $errorMessage")
-          promise.reject("SESSION_ERROR", errorMessage)
+          promise.reject("SESSION_ERROR", result.reason.message ?: "Unknown error")
         }
       }
-      currentSession?.let {
-        currentSession?.recognitionResults()?.collect { result: MatchResult ->
-          android.util.Log.d("ShazamResult", "FIRST LINE")
+
+      // Collect match results, etc.
+      currentSession?.let { session ->
+        session.recognitionResults().collect { result: MatchResult ->
           try{
             when (result) {
               is MatchResult.Match -> {
@@ -110,60 +151,29 @@ class ShazamKitModule : Module() {
           }
         }
       }
-
     } catch (e: Exception) {
-      android.util.Log.e("ShazamResult", "Error in shazamStarter: ${e.message}", e)
       promise.reject("SHAZAM_ERROR", e.message, e)
-    }
-  }
-
-  override fun definition() = ModuleDefinition {
-    Name("ExpoShazamKit")
-
-
-    val tokenProvider = ShazamDeveloperTokenProvider(context)
-    catalog = ShazamKit.createShazamCatalog(tokenProvider)
-
-
-    Function("isAvailable") {
-      true
-    }
-
-    AsyncFunction("startListening") { promise: Promise ->
-      if (!checkPermission()) {
-        promise.reject("ERR_PERMISSION", "Recording permission not granted")
-        return@AsyncFunction
-      }
-      
-      job = CoroutineScope(Dispatchers.Unconfined).launch {
-        shazamStarter(promise)
-      }
-    }
-
-    AsyncFunction("stopListening") { promise: Promise ->
-      Log.d("Shazam", "Stoplistening called from react native")
-      stopShazamListening(promise)
     }
   }
 
   @RequiresPermission(Manifest.permission.RECORD_AUDIO)
   fun startListening(promise: Promise) {
-    Log.d("Shazam", "start Listening")
     try {
-      Log.d("Shazam", "${currentSession.toString()} current session")
-      if (currentSession == null) {
-        return
-      }
-      Log.d("Shazam", "start Listening started")
-      val audioSource = MediaRecorder.AudioSource.DEFAULT
-      val audioFormat = AudioFormat.Builder().setChannelMask(AudioFormat.CHANNEL_IN_MONO)
-        .setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(48_000).build()
+      if (currentSession == null) return
 
-      audioRecord =
-        AudioRecord.Builder().setAudioSource(audioSource).setAudioFormat(audioFormat)
-          .build()
+      val audioFormat = AudioFormat.Builder()
+        .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
+        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+        .setSampleRate(48000)
+        .build()
+
+      audioRecord = AudioRecord.Builder()
+        .setAudioSource(MediaRecorder.AudioSource.DEFAULT)
+        .setAudioFormat(audioFormat)
+        .build()
+
       val bufferSize = AudioRecord.getMinBufferSize(
-        48_000,
+        48000,
         AudioFormat.CHANNEL_IN_MONO,
         AudioFormat.ENCODING_PCM_16BIT
       )
@@ -172,22 +182,19 @@ class ShazamKitModule : Module() {
       recordingThread = Thread({
         val readBuffer = ByteArray(bufferSize)
         while (isRecording) {
-          Log.d("Shazam", "Recording Works")
           val actualRead = audioRecord!!.read(readBuffer, 0, bufferSize)
           currentSession?.matchStream(readBuffer, actualRead, System.currentTimeMillis())
         }
       }, "AudioRecorder Thread")
       recordingThread!!.start()
     } catch (e: Exception) {
-      Log.d("Shazam", "Recording Error ${e.toString()}")
-      e.message?.let { onError(it) }
+      promise.reject("START_LISTENING_ERROR", e.message, e)
     }
   }
 
   fun stopShazamListening(promise: Promise) {
-    Log.d("Shazam", "Stoplistening works ${audioRecord.toString()}")
     if (audioRecord != null) {
-      isRecording = false;
+      isRecording = false
       audioRecord!!.stop()
       audioRecord!!.release()
       audioRecord = null
@@ -198,10 +205,6 @@ class ShazamKitModule : Module() {
   }
 
   private fun onError(message: String) {
-    Log.d("ShazamError", message.toString())
-  }
-
-  fun isAvailable(): Boolean {
-    return true
+    Log.d("ShazamError", message)
   }
 }
