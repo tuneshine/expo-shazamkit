@@ -1,13 +1,9 @@
 package expo.community.modules.shazamkit
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
-import androidx.annotation.WorkerThread
-import androidx.core.app.ActivityCompat
 import com.shazam.shazamkit.*
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.Exceptions
