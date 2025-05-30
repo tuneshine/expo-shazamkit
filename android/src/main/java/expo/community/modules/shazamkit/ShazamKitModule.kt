@@ -6,7 +6,6 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
-import androidx.annotation.RequiresPermission
 import androidx.annotation.WorkerThread
 import androidx.core.app.ActivityCompat
 import com.shazam.shazamkit.*
@@ -137,7 +136,6 @@ class ShazamKitModule : Module() {
         }
     }
 
-    @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun startListening(promise: Promise) {
         Log.d("Shazam", "start Listening")
         try {
