@@ -1,9 +1,14 @@
-import { NativeModulesProxy } from "expo-modules-core";
+import { requireOptionalNativeModule } from "expo-modules-core";
 
-export default NativeModulesProxy.ExpoShazamKit || {
+const ExpoShazamKitModule = requireOptionalNativeModule("ExpoShazamKit");
+
+console.log("DEBUG: ExpoShazamKit module loaded?", !!ExpoShazamKitModule);
+console.log("DEBUG: ExpoShazamKit module:", ExpoShazamKitModule);
+
+export default ExpoShazamKitModule || {
   isAvailable(): boolean {
     console.log("STUB: isAvailable fallback called");
-    return true;
+    return false;
   },
 
   startListening() {
