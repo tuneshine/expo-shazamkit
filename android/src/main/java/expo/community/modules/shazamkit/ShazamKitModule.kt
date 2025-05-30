@@ -36,12 +36,6 @@ class ShazamKitModule : Module() {
     private var isRecording = false
     var job: Job? = null
 
-    private fun checkPermission(): Boolean {
-        return ActivityCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-    }
 
     suspend fun shazamStarter(promise: Promise) {
         try {
@@ -132,11 +126,6 @@ class ShazamKitModule : Module() {
         }
 
         AsyncFunction("startListening") { promise: Promise ->
-            if (!checkPermission()) {
-                promise.reject("ERR_PERMISSION", "Recording permission not granted", null)
-                return@AsyncFunction
-            }
-            
             job = CoroutineScope(Dispatchers.Unconfined).launch {
                 shazamStarter(promise)
             }
