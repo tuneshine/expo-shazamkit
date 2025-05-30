@@ -34,7 +34,8 @@ class ShazamKitModule : Module() {
 
     suspend fun shazamStarter(promise: Promise) {
         try {
-            android.util.Log.d("ShazamResult", "Starting Shazam session")
+            Log.d("ShazamKit", "shazamStarter: Starting Shazam session")
+            Log.d("ShazamKit", "shazamStarter: Catalog available: ${::catalog.isInitialized}")
 
             when (val result = ShazamKit.createStreamingSession(
                 catalog,
@@ -42,66 +43,83 @@ class ShazamKitModule : Module() {
                 8192
             )) {
                 is ShazamKitResult.Success -> {
-                    android.util.Log.d("ShazamResult", "Session created successfully")
+                    Log.d("ShazamKit", "shazamStarter: Session created successfully")
                     currentSession = result.data
+                    Log.d("ShazamKit", "shazamStarter: Current session set: ${currentSession != null}")
+                    
                     CoroutineScope(Dispatchers.IO).launch {
+                        Log.d("ShazamKit", "shazamStarter: Launching IO coroutine for startListening")
                         startListening(promise)
                     }
                 }
                 is ShazamKitResult.Failure -> {
                     val errorMessage = result.reason.message ?: "Unknown error creating session"
-                    android.util.Log.e("ShazamResult", "Failed to create session: $errorMessage")
+                    Log.e("ShazamKit", "shazamStarter: Failed to create session: $errorMessage")
+                    Log.e("ShazamKit", "shazamStarter: Failure reason: ${result.reason}")
                     promise.reject("SESSION_ERROR", errorMessage, null)
+                    return
                 }
             }
-            currentSession?.let {
-                currentSession?.recognitionResults()?.collect { result: MatchResult ->
-                    android.util.Log.d("ShazamResult", "FIRST LINE")
-                    try{
-                        when (result) {
-                            is MatchResult.Match -> {
-                                android.util.Log.d("ShazamResult", "MATCH")
-                                val results = result.matchedMediaItems.map {
-                                    MatchedItem(
-                                        isrc = it.isrc,
-                                        title = it.title,
-                                        artist = it.artist,
-                                        shazamID = it.shazamID,
-                                        appleMusicID = it.appleMusicID,
-                                        appleMusicURL = it.appleMusicURL?.toString().orEmpty(),
-                                        artworkURL = it.artworkURL?.toString().orEmpty(),
-                                        genres = it.genres,
-                                        webURL = it.webURL?.toString().orEmpty(),
-                                        subtitle = it.subtitle,
-                                        videoURL = it.videoURL?.toString().orEmpty(),
-                                        explicitContent = it.explicitContent ?: false,
-                                        matchOffset = it.matchOffsetInMs?.toDouble() ?: 0.0
-                                    )
+            Log.d("ShazamKit", "shazamStarter: Setting up recognition results collection")
+            currentSession?.let { session ->
+                Log.d("ShazamKit", "shazamStarter: Current session is not null, starting results collection")
+                try {
+                    session.recognitionResults().collect { result: MatchResult ->
+                        Log.d("ShazamKit", "shazamStarter: Received recognition result: ${result::class.simpleName}")
+                        try{
+                            when (result) {
+                                is MatchResult.Match -> {
+                                    Log.d("ShazamKit", "shazamStarter: MATCH found with ${result.matchedMediaItems.size} items")
+                                    val results = result.matchedMediaItems.map {
+                                        MatchedItem(
+                                            isrc = it.isrc,
+                                            title = it.title,
+                                            artist = it.artist,
+                                            shazamID = it.shazamID,
+                                            appleMusicID = it.appleMusicID,
+                                            appleMusicURL = it.appleMusicURL?.toString().orEmpty(),
+                                            artworkURL = it.artworkURL?.toString().orEmpty(),
+                                            genres = it.genres,
+                                            webURL = it.webURL?.toString().orEmpty(),
+                                            subtitle = it.subtitle,
+                                            videoURL = it.videoURL?.toString().orEmpty(),
+                                            explicitContent = it.explicitContent ?: false,
+                                            matchOffset = it.matchOffsetInMs?.toDouble() ?: 0.0
+                                        )
+                                    }
+                                    Log.d("ShazamKit", "shazamStarter: Resolving promise with results: ${results.size} items")
+                                    promise.resolve(results)
+                                    stopShazamListening(promise)
                                 }
-                                android.util.Log.d("ShazamResult", results.toString())
-                                promise.resolve(results)
-                                stopShazamListening(promise)
+                                is MatchResult.NoMatch -> {
+                                    Log.d("ShazamKit", "shazamStarter: NoMatch result received")
+                                    promise.reject(NoMatchException())
+                                    stopShazamListening(promise)
+                                }
+                                is MatchResult.Error -> {
+                                    Log.e("ShazamKit", "shazamStarter: MatchResult Error: ${result.exception.message}")
+                                    Log.e("ShazamKit", "shazamStarter: Exception details", result.exception)
+                                    promise.reject("MatchResult Error", result.exception.message, result.exception.cause)
+                                    stopShazamListening(promise)
+                                }
                             }
-                            is MatchResult.NoMatch -> {
-                                android.util.Log.d("ShazamResult", "NoMatch")
-                                promise.reject(NoMatchException())
-                                stopShazamListening(promise)
-                            }
-                            is MatchResult.Error -> {
-                                android.util.Log.d("ShazamResult", result.exception.message.toString())
-                                promise.reject("MatchResult Error", result.exception.message, result.exception.cause)
-                                stopShazamListening(promise)
-                            }
+                        }catch (e: Exception){
+                            Log.e("ShazamKit", "shazamStarter: Exception in result processing: ${e.message}", e)
+                            e.message?.let { onError(it) }
+                            stopShazamListening(promise)
                         }
-                    }catch (e: Exception){
-                        e.message?.let { onError(it) }
-                        stopShazamListening(promise)
                     }
+                } catch (e: Exception) {
+                    Log.e("ShazamKit", "shazamStarter: Exception in recognition results collection: ${e.message}", e)
+                    promise.reject("RECOGNITION_ERROR", e.message, e)
                 }
+            } ?: run {
+                Log.e("ShazamKit", "shazamStarter: Current session is null after creation - this should not happen")
+                promise.reject("SESSION_NULL", "Session is null after successful creation", null)
             }
 
         } catch (e: Exception) {
-            android.util.Log.e("ShazamResult", "Error in shazamStarter: ${e.message}", e)
+            Log.e("ShazamKit", "shazamStarter: Uncaught exception: ${e.message}", e)
             promise.reject("SHAZAM_ERROR", e.message, e)
         }
     }
@@ -121,8 +139,16 @@ class ShazamKitModule : Module() {
         }
 
         AsyncFunction("startListening") { promise: Promise ->
-            job = CoroutineScope(Dispatchers.Unconfined).launch {
-                shazamStarter(promise)
+            Log.d("ShazamKit", "startListening called from React Native")
+            try {
+                job = CoroutineScope(Dispatchers.Unconfined).launch {
+                    Log.d("ShazamKit", "Coroutine launched, calling shazamStarter")
+                    shazamStarter(promise)
+                }
+                Log.d("ShazamKit", "Coroutine created successfully")
+            } catch (e: Exception) {
+                Log.e("ShazamKit", "Error launching coroutine: ${e.message}", e)
+                promise.reject("COROUTINE_ERROR", e.message, e)
             }
         }
 
@@ -133,51 +159,96 @@ class ShazamKitModule : Module() {
     }
 
     fun startListening(promise: Promise) {
-        Log.d("Shazam", "start Listening")
+        Log.d("ShazamKit", "startListening: Function called")
         try {
-            Log.d("Shazam", "${currentSession.toString()} current session")
+            Log.d("ShazamKit", "startListening: Current session: ${currentSession?.toString() ?: "null"}")
             if (currentSession == null) {
+                Log.e("ShazamKit", "startListening: Current session is null, cannot start listening")
+                promise.reject("SESSION_NULL", "Current session is null", null)
                 return
             }
-            Log.d("Shazam", "start Listening started")
+            Log.d("ShazamKit", "startListening: Session validated, setting up audio recording")
+            
             val audioSource = MediaRecorder.AudioSource.DEFAULT
             val audioFormat = AudioFormat.Builder().setChannelMask(AudioFormat.CHANNEL_IN_MONO)
                 .setEncoding(AudioFormat.ENCODING_PCM_16BIT).setSampleRate(48_000).build()
 
+            Log.d("ShazamKit", "startListening: Creating AudioRecord with source: $audioSource")
             audioRecord =
                 AudioRecord.Builder().setAudioSource(audioSource).setAudioFormat(audioFormat)
                     .build()
+            
             val bufferSize = AudioRecord.getMinBufferSize(
                 48_000,
                 AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT
             )
+            Log.d("ShazamKit", "startListening: Buffer size: $bufferSize")
+            
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                Log.e("ShazamKit", "startListening: AudioRecord failed to initialize, state: ${audioRecord?.state}")
+                promise.reject("AUDIO_INIT_ERROR", "AudioRecord failed to initialize", null)
+                return
+            }
+            
+            Log.d("ShazamKit", "startListening: Starting audio recording")
             audioRecord?.startRecording()
+            
+            if (audioRecord?.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                Log.e("ShazamKit", "startListening: Failed to start recording, state: ${audioRecord?.recordingState}")
+                promise.reject("RECORDING_START_ERROR", "Failed to start audio recording", null)
+                return
+            }
+            
             isRecording = true
+            Log.d("ShazamKit", "startListening: Creating and starting recording thread")
             recordingThread = Thread({
                 val readBuffer = ByteArray(bufferSize)
+                Log.d("ShazamKit", "Recording thread started")
                 while (isRecording) {
-                    Log.d("Shazam", "Recording Works")
-                    val actualRead = audioRecord!!.read(readBuffer, 0, bufferSize)
-                    currentSession?.matchStream(readBuffer, actualRead, System.currentTimeMillis())
+                    try {
+                        val actualRead = audioRecord!!.read(readBuffer, 0, bufferSize)
+                        if (actualRead > 0) {
+                            Log.v("ShazamKit", "Read $actualRead bytes from microphone")
+                            currentSession?.matchStream(readBuffer, actualRead, System.currentTimeMillis())
+                        } else {
+                            Log.w("ShazamKit", "Audio read returned: $actualRead")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ShazamKit", "Error in recording thread: ${e.message}", e)
+                        isRecording = false
+                    }
                 }
+                Log.d("ShazamKit", "Recording thread finished")
             }, "AudioRecorder Thread")
             recordingThread!!.start()
+            Log.d("ShazamKit", "startListening: Recording thread started successfully")
         } catch (e: Exception) {
-            Log.d("Shazam", "Recording Error ${e.toString()}")
+            Log.e("ShazamKit", "startListening: Exception: ${e.message}", e)
+            promise.reject("RECORDING_ERROR", e.message, e)
             e.message?.let { onError(it) }
         }
     }
 
     fun stopShazamListening(promise: Promise) {
-        Log.d("Shazam", "Stoplistening works ${audioRecord.toString()}")
+        Log.d("ShazamKit", "stopShazamListening: Called with audioRecord: ${audioRecord?.toString() ?: "null"}")
         if (audioRecord != null) {
+            Log.d("ShazamKit", "stopShazamListening: Stopping recording")
             isRecording = false;
-            audioRecord!!.stop()
-            audioRecord!!.release()
+            try {
+                audioRecord!!.stop()
+                audioRecord!!.release()
+                Log.d("ShazamKit", "stopShazamListening: AudioRecord stopped and released")
+            } catch (e: Exception) {
+                Log.e("ShazamKit", "stopShazamListening: Error stopping AudioRecord: ${e.message}", e)
+            }
             audioRecord = null
             recordingThread = null
             job?.cancel()
+            Log.d("ShazamKit", "stopShazamListening: Cleanup completed")
+            promise.resolve(true)
+        } else {
+            Log.d("ShazamKit", "stopShazamListening: AudioRecord was null, nothing to stop")
             promise.resolve(true)
         }
     }
