@@ -32,14 +32,12 @@
   "license": "MIT",
   "homepage": "https://github.com/ibrahimtuna/expo-shazamkit#readme",
   "dependencies": {
-    "expo-modules-core": "^1.1.0",
-    "expo-module-scripts": "^3.0.4"
+    "expo-module-scripts": "^4.1.7",
+    "expo-modules-core": "^2.3.13"
   },
   "devDependencies": {
-    "@types/react": "^18.0.25",
-    "@types/react-native": "^0.70.6",
-    "expo-module-scripts": "^3.0.4",
-    "expo-modules-core": "^1.1.0"
+    "@types/react": "^19.1.6",
+    "@types/react-native": "^0.73.0"
   },
   "peerDependencies": {
     "expo": "*",

@@ -122,7 +122,7 @@ class ShazamKitModule : Module() {
 
 
         val tokenProvider = DeveloperTokenProvider {
-            DeveloperToken("eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IlZINkM1V0pRQUwifQ.eyJpc3MiOiJWMzcyUzZHV1RUIiwiaWF0IjoxNzQ4NjIwNzc2LCJleHAiOjE3NDkyMjU1NzZ9.V3PB341BQGyxjnEB_RLUDrTyZGr7x_4Bcu4sn9Y2gOQ2LCZh5sskvEECoUbDwECJggdm7U8U7AOU8JMBu8ZqxA")
+            DeveloperToken("eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IlZINkM1V0pRQUwifQ.eyJpc3MiOiJWMzcyUzZHV1RUIiwiaWF0IjoxNzQ4NjIyMjAzLCJleHAiOjE3NDg2MjU4MDN9.V0yasE27235oLItDKBrWMzTy942VnpQBKhnljhTRxmzZFjg7MzgmVmvLSvmIBe3wJZg6b6rddVJiuokmPEwNgQ")
         }
         catalog = ShazamKit.createShazamCatalog(tokenProvider)
 
