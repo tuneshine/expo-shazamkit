@@ -62,7 +62,7 @@ class ShazamKitModule : Module() {
                 is ShazamKitResult.Failure -> {
                     val errorMessage = result.reason.message ?: "Unknown error creating session"
                     android.util.Log.e("ShazamResult", "Failed to create session: $errorMessage")
-                    promise.reject("SESSION_ERROR", errorMessage)
+                    promise.reject("SESSION_ERROR", errorMessage, null)
                 }
             }
             currentSession?.let {
@@ -133,7 +133,7 @@ class ShazamKitModule : Module() {
 
         AsyncFunction("startListening") { promise: Promise ->
             if (!checkPermission()) {
-                promise.reject("ERR_PERMISSION", "Recording permission not granted")
+                promise.reject("ERR_PERMISSION", "Recording permission not granted", null)
                 return@AsyncFunction
             }
             
