@@ -34,8 +34,8 @@ class ShazamKitModule : Module() {
 
     suspend fun shazamStarter(promise: Promise) {
         try {
-            Log.d("ShazamKit", "shazamStarter: Starting Shazam session")
-            Log.d("ShazamKit", "shazamStarter: Catalog available: ${::catalog.isInitialized}")
+            Log.i("ShazamKit", "shazamStarter: Starting Shazam session")
+            Log.i("ShazamKit", "shazamStarter: Catalog available: ${::catalog.isInitialized}")
 
             when (val result = ShazamKit.createStreamingSession(
                 catalog,
@@ -127,6 +127,7 @@ class ShazamKitModule : Module() {
     override fun definition() = ModuleDefinition {
         Name("ExpoShazamKit")
 
+        Log.i("ShazamKit", "MODULE INITIALIZATION - ShazamKit module is being initialized")
 
         val tokenProvider = DeveloperTokenProvider {
             DeveloperToken("eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IlZINkM1V0pRQUwifQ.eyJpc3MiOiJWMzcyUzZHV1RUIiwiaWF0IjoxNzQ4NjI1NzU1LCJleHAiOjE3NDg2MjkzNTV9.DoXfpx5nEckXAnzrvByD5CRe5Xk0u56DzuK2puJu_7gVujzt9sz7Psh1K-U0Egw48Z0xLj4AILMdveQ2uqXv4g")
@@ -139,13 +140,13 @@ class ShazamKitModule : Module() {
         }
 
         AsyncFunction("startListening") { promise: Promise ->
-            Log.d("ShazamKit", "startListening called from React Native")
+            Log.i("ShazamKit", "startListening called from React Native")
             try {
                 job = CoroutineScope(Dispatchers.Unconfined).launch {
-                    Log.d("ShazamKit", "Coroutine launched, calling shazamStarter")
+                    Log.i("ShazamKit", "Coroutine launched, calling shazamStarter")
                     shazamStarter(promise)
                 }
-                Log.d("ShazamKit", "Coroutine created successfully")
+                Log.i("ShazamKit", "Coroutine created successfully")
             } catch (e: Exception) {
                 Log.e("ShazamKit", "Error launching coroutine: ${e.message}", e)
                 promise.reject("COROUTINE_ERROR", e.message, e)
