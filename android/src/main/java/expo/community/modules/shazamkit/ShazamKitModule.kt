@@ -136,6 +136,7 @@ class ShazamKitModule : Module() {
 
 
         Function("isAvailable") {
+            Log.e("ShazamKit", "=== ISAVAILABLE CALLED ===")
             true
         }
 

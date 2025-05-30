@@ -2,12 +2,17 @@ import { NativeModulesProxy } from "expo-modules-core";
 
 export default NativeModulesProxy.ExpoShazamKit || {
   isAvailable(): boolean {
+    console.log("STUB: isAvailable fallback called");
     return true;
   },
 
-  startListening() {},
+  startListening() {
+    console.log("STUB: startListening fallback called - native module not loaded!");
+  },
 
-  stopListening() {},
+  stopListening() {
+    console.log("STUB: stopListening fallback called");
+  },
 
   addToShazamLibrary() {
     return { success: false };
