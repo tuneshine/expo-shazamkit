@@ -31,6 +31,7 @@ class ShazamKitModule : Module() {
     private var isRecording = false
     var job: Job? = null
     private var developerToken: String? = null
+    private var currentPromise: Promise? = null
 
 
     suspend fun shazamStarter(promise: Promise) {
@@ -57,7 +58,7 @@ class ShazamKitModule : Module() {
                     val errorMessage = result.reason.message ?: "Unknown error creating session"
                     Log.e("ShazamKit", "shazamStarter: Failed to create session: $errorMessage")
                     Log.e("ShazamKit", "shazamStarter: Failure reason: ${result.reason}")
-                    promise.reject("SESSION_ERROR", errorMessage, null)
+                    safeReject(promise, "SESSION_ERROR", errorMessage, null)
                     return
                 }
             }
@@ -89,18 +90,18 @@ class ShazamKitModule : Module() {
                                         )
                                     }
                                     Log.d("ShazamKit", "shazamStarter: Resolving promise with results: ${results.size} items")
-                                    promise.resolve(results)
+                                    safeResolve(promise, results)
                                     stopShazamListening(promise)
                                 }
                                 is MatchResult.NoMatch -> {
                                     Log.d("ShazamKit", "shazamStarter: NoMatch result received")
-                                    promise.reject(NoMatchException())
+                                    safeReject(promise, "NO_MATCH", "No match found", null)
                                     stopShazamListening(promise)
                                 }
                                 is MatchResult.Error -> {
                                     Log.e("ShazamKit", "shazamStarter: MatchResult Error: ${result.exception.message}")
                                     Log.e("ShazamKit", "shazamStarter: Exception details", result.exception)
-                                    promise.reject("MatchResult Error", result.exception.message, result.exception.cause)
+                                    safeReject(promise, "MATCH_ERROR", result.exception.message, result.exception.cause)
                                     stopShazamListening(promise)
                                 }
                             }
@@ -112,16 +113,16 @@ class ShazamKitModule : Module() {
                     }
                 } catch (e: Exception) {
                     Log.e("ShazamKit", "shazamStarter: Exception in recognition results collection: ${e.message}", e)
-                    promise.reject("RECOGNITION_ERROR", e.message, e)
+                    safeReject(promise, "RECOGNITION_ERROR", e.message, e)
                 }
             } ?: run {
                 Log.e("ShazamKit", "shazamStarter: Current session is null after creation - this should not happen")
-                promise.reject("SESSION_NULL", "Session is null after successful creation", null)
+                safeReject(promise, "SESSION_NULL", "Session is null after successful creation", null)
             }
 
         } catch (e: Exception) {
             Log.e("ShazamKit", "shazamStarter: Uncaught exception: ${e.message}", e)
-            promise.reject("SHAZAM_ERROR", e.message, e)
+            safeReject(promise, "SHAZAM_ERROR", e.message, e)
         }
     }
 
@@ -150,6 +151,15 @@ class ShazamKitModule : Module() {
 
         AsyncFunction("startListening") { promise: Promise ->
             Log.i("ShazamKit", "startListening called from React Native")
+            
+            if (currentPromise != null) {
+                Log.w("ShazamKit", "startListening: Already have active promise, rejecting new request")
+                promise.reject("ALREADY_LISTENING", "Already listening for Shazam matches", null)
+                return@AsyncFunction
+            }
+            
+            currentPromise = promise
+            
             try {
                 job = CoroutineScope(Dispatchers.Unconfined).launch {
                     Log.i("ShazamKit", "Coroutine launched, calling shazamStarter")
@@ -158,7 +168,7 @@ class ShazamKitModule : Module() {
                 Log.i("ShazamKit", "Coroutine created successfully")
             } catch (e: Exception) {
                 Log.e("ShazamKit", "Error launching coroutine: ${e.message}", e)
-                promise.reject("COROUTINE_ERROR", e.message, e)
+                safeReject(promise, "COROUTINE_ERROR", e.message, e)
             }
         }
 
@@ -174,7 +184,7 @@ class ShazamKitModule : Module() {
             Log.d("ShazamKit", "startListening: Current session: ${currentSession?.toString() ?: "null"}")
             if (currentSession == null) {
                 Log.e("ShazamKit", "startListening: Current session is null, cannot start listening")
-                promise.reject("SESSION_NULL", "Current session is null", null)
+                safeReject(promise, "SESSION_NULL", "Current session is null", null)
                 return
             }
             Log.d("ShazamKit", "startListening: Session validated, setting up audio recording")
@@ -197,7 +207,7 @@ class ShazamKitModule : Module() {
             
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
                 Log.e("ShazamKit", "startListening: AudioRecord failed to initialize, state: ${audioRecord?.state}")
-                promise.reject("AUDIO_INIT_ERROR", "AudioRecord failed to initialize", null)
+                safeReject(promise, "AUDIO_INIT_ERROR", "AudioRecord failed to initialize", null)
                 return
             }
             
@@ -206,7 +216,7 @@ class ShazamKitModule : Module() {
             
             if (audioRecord?.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
                 Log.e("ShazamKit", "startListening: Failed to start recording, state: ${audioRecord?.recordingState}")
-                promise.reject("RECORDING_START_ERROR", "Failed to start audio recording", null)
+                safeReject(promise, "RECORDING_START_ERROR", "Failed to start audio recording", null)
                 return
             }
             
@@ -235,13 +245,17 @@ class ShazamKitModule : Module() {
             Log.d("ShazamKit", "startListening: Recording thread started successfully")
         } catch (e: Exception) {
             Log.e("ShazamKit", "startListening: Exception: ${e.message}", e)
-            promise.reject("RECORDING_ERROR", e.message, e)
+            safeReject(promise, "RECORDING_ERROR", e.message, e)
             e.message?.let { onError(it) }
         }
     }
 
     fun stopShazamListening(promise: Promise) {
         Log.d("ShazamKit", "stopShazamListening: Called with audioRecord: ${audioRecord?.toString() ?: "null"}")
+        
+        // Clear current promise since we're stopping
+        currentPromise = null
+        
         if (audioRecord != null) {
             Log.d("ShazamKit", "stopShazamListening: Stopping recording")
             isRecording = false;
@@ -265,6 +279,26 @@ class ShazamKitModule : Module() {
 
     private fun onError(message: String) {
         Log.d("ShazamError", message.toString())
+    }
+
+    private fun safeResolve(promise: Promise, result: Any?) {
+        if (currentPromise == promise) {
+            Log.d("ShazamKit", "safeResolve: Resolving promise")
+            currentPromise = null
+            promise.resolve(result)
+        } else {
+            Log.w("ShazamKit", "safeResolve: Promise already settled, ignoring")
+        }
+    }
+
+    private fun safeReject(promise: Promise, code: String, message: String?, cause: Throwable?) {
+        if (currentPromise == promise) {
+            Log.d("ShazamKit", "safeReject: Rejecting promise with code: $code")
+            currentPromise = null
+            promise.reject(code, message, cause)
+        } else {
+            Log.w("ShazamKit", "safeReject: Promise already settled, ignoring")
+        }
     }
 
     fun isAvailable(): Boolean {
