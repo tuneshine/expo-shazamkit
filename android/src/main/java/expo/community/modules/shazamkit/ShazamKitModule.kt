@@ -91,24 +91,24 @@ class ShazamKitModule : Module() {
                                     }
                                     Log.d("ShazamKit", "shazamStarter: Resolving promise with results: ${results.size} items")
                                     safeResolve(promise, results)
-                                    stopShazamListening(promise)
+                                    cleanup()
                                 }
                                 is MatchResult.NoMatch -> {
                                     Log.d("ShazamKit", "shazamStarter: NoMatch result received")
                                     safeReject(promise, "NO_MATCH", "No match found", null)
-                                    stopShazamListening(promise)
+                                    cleanup()
                                 }
                                 is MatchResult.Error -> {
                                     Log.e("ShazamKit", "shazamStarter: MatchResult Error: ${result.exception.message}")
                                     Log.e("ShazamKit", "shazamStarter: Exception details", result.exception)
                                     safeReject(promise, "MATCH_ERROR", result.exception.message, result.exception.cause)
-                                    stopShazamListening(promise)
+                                    cleanup()
                                 }
                             }
                         }catch (e: Exception){
                             Log.e("ShazamKit", "shazamStarter: Exception in result processing: ${e.message}", e)
                             e.message?.let { onError(it) }
-                            stopShazamListening(promise)
+                            cleanup()
                         }
                     }
                 } catch (e: Exception) {
@@ -250,31 +250,33 @@ class ShazamKitModule : Module() {
         }
     }
 
-    fun stopShazamListening(promise: Promise) {
-        Log.d("ShazamKit", "stopShazamListening: Called with audioRecord: ${audioRecord?.toString() ?: "null"}")
-        
-        // Clear current promise since we're stopping
+    private fun cleanup() {
+        Log.d("ShazamKit", "cleanup: Called")
         currentPromise = null
         
         if (audioRecord != null) {
-            Log.d("ShazamKit", "stopShazamListening: Stopping recording")
+            Log.d("ShazamKit", "cleanup: Stopping recording")
             isRecording = false;
             try {
                 audioRecord!!.stop()
                 audioRecord!!.release()
-                Log.d("ShazamKit", "stopShazamListening: AudioRecord stopped and released")
+                Log.d("ShazamKit", "cleanup: AudioRecord stopped and released")
             } catch (e: Exception) {
-                Log.e("ShazamKit", "stopShazamListening: Error stopping AudioRecord: ${e.message}", e)
+                Log.e("ShazamKit", "cleanup: Error stopping AudioRecord: ${e.message}", e)
             }
             audioRecord = null
             recordingThread = null
             job?.cancel()
-            Log.d("ShazamKit", "stopShazamListening: Cleanup completed")
-            promise.resolve(true)
+            Log.d("ShazamKit", "cleanup: Cleanup completed")
         } else {
-            Log.d("ShazamKit", "stopShazamListening: AudioRecord was null, nothing to stop")
-            promise.resolve(true)
+            Log.d("ShazamKit", "cleanup: AudioRecord was null, nothing to stop")
         }
+    }
+
+    fun stopShazamListening(promise: Promise) {
+        Log.d("ShazamKit", "stopShazamListening: Called")
+        cleanup()
+        promise.resolve(true)
     }
 
     private fun onError(message: String) {
