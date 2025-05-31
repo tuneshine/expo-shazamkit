@@ -19,6 +19,10 @@ export default ExpoShazamKitModule || {
     console.log("STUB: stopListening fallback called");
   },
 
+  setDeveloperToken(token: string) {
+    console.log("STUB: setDeveloperToken fallback called");
+  },
+
   addToShazamLibrary() {
     return { success: false };
   },

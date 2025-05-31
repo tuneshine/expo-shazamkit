@@ -30,6 +30,7 @@ class ShazamKitModule : Module() {
     private var recordingThread: Thread? = null
     private var isRecording = false
     var job: Job? = null
+    private var developerToken: String? = null
 
 
     suspend fun shazamStarter(promise: Promise) {
@@ -129,10 +130,17 @@ class ShazamKitModule : Module() {
 
         Log.i("ShazamKit", "MODULE INITIALIZATION - ShazamKit module is being initialized")
 
-        val tokenProvider = DeveloperTokenProvider {
-            DeveloperToken("eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IlZINkM1V0pRQUwifQ.eyJpc3MiOiJWMzcyUzZHV1RUIiwiaWF0IjoxNzQ4NjM0MTY3LCJleHAiOjE3NDg2Mzc3Njd9.F852PKUfc4cxxNrvMqxN8BhIvEtVYaewT5aJcE_wVniwN_os1cxgdRltYqI_JfbOqFFRZat65joYmT-8wk9wlQ")
+        Function("setDeveloperToken") { token: String ->
+            Log.i("ShazamKit", "setDeveloperToken called with token: ${token.take(20)}...")
+            developerToken = token
+            
+            // Recreate catalog with new token
+            val tokenProvider = DeveloperTokenProvider {
+                DeveloperToken(token)
+            }
+            catalog = ShazamKit.createShazamCatalog(tokenProvider)
+            Log.i("ShazamKit", "Catalog recreated with new developer token")
         }
-        catalog = ShazamKit.createShazamCatalog(tokenProvider)
 
 
         Function("isAvailable") {

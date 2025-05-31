@@ -13,6 +13,10 @@ export function stopListening() {
   ExpoShazamKit.stopListening();
 }
 
+export function setDeveloperToken(token: string): void {
+  return ExpoShazamKit.setDeveloperToken(token);
+}
+
 export async function addToShazamLibrary(): Promise<{ success: boolean }> {
   return await ExpoShazamKit.addToShazamLibrary();
 }

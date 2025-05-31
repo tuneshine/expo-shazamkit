@@ -60,6 +60,10 @@ public class ShazamKitModule: Module, ResultHandler {
         Function("stopListening") {
             stopListening()
         }
+
+        Function("setDeveloperToken") { (token: String) in
+            log.warn("⚠️ Warning: setDeveloperToken called on iOS - developer tokens are not needed on iOS platform")
+        }
     }
 
     func didFind(match: SHMatch) {
