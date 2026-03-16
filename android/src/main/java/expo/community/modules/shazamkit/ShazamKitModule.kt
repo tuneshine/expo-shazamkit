@@ -28,7 +28,7 @@ class ShazamKitModule : Module() {
     private var currentSession: StreamingSession? = null
     private var audioRecord: AudioRecord? = null
     private var recordingThread: Thread? = null
-    private var isRecording = false
+    @Volatile private var isRecording = false
     var job: Job? = null
     private var developerToken: String? = null
     private var currentPromise: Promise? = null
@@ -151,7 +151,12 @@ class ShazamKitModule : Module() {
 
         AsyncFunction("startListening") { promise: Promise ->
             Log.i("ShazamKit", "startListening called from React Native")
-            
+
+            if (currentSession != null || audioRecord != null) {
+                Log.w("ShazamKit", "startListening: Stale session/audioRecord found, cleaning up first")
+                cleanup()
+            }
+
             if (currentPromise != null) {
                 Log.w("ShazamKit", "startListening: Already have active promise, rejecting new request")
                 promise.reject("ALREADY_LISTENING", "Already listening for Shazam matches", null)
@@ -227,7 +232,8 @@ class ShazamKitModule : Module() {
                 Log.d("ShazamKit", "Recording thread started")
                 while (isRecording) {
                     try {
-                        val actualRead = audioRecord!!.read(readBuffer, 0, bufferSize)
+                        val recorder = audioRecord ?: break
+                        val actualRead = recorder.read(readBuffer, 0, bufferSize)
                         if (actualRead > 0) {
                             Log.v("ShazamKit", "Read $actualRead bytes from microphone")
                             currentSession?.matchStream(readBuffer, actualRead, System.currentTimeMillis())
@@ -253,24 +259,45 @@ class ShazamKitModule : Module() {
     private fun cleanup() {
         Log.d("ShazamKit", "cleanup: Called")
         currentPromise = null
-        
-        if (audioRecord != null) {
-            Log.d("ShazamKit", "cleanup: Stopping recording")
-            isRecording = false;
+
+        isRecording = false
+
+        // Capture and null the thread reference, then join to ensure it exits
+        // before we release AudioRecord resources
+        val thread = recordingThread
+        recordingThread = null
+        if (thread != null) {
+            Log.d("ShazamKit", "cleanup: Joining recording thread")
             try {
-                audioRecord!!.stop()
-                audioRecord!!.release()
+                thread.join(2000)
+                if (thread.isAlive) {
+                    Log.w("ShazamKit", "cleanup: Recording thread did not stop within 2s")
+                }
+            } catch (e: InterruptedException) {
+                Log.w("ShazamKit", "cleanup: Interrupted while joining recording thread", e)
+            }
+        }
+
+        // Now safe to stop and release AudioRecord — thread is no longer reading
+        val recorder = audioRecord
+        audioRecord = null
+        if (recorder != null) {
+            Log.d("ShazamKit", "cleanup: Stopping and releasing AudioRecord")
+            try {
+                recorder.stop()
+                recorder.release()
                 Log.d("ShazamKit", "cleanup: AudioRecord stopped and released")
             } catch (e: Exception) {
                 Log.e("ShazamKit", "cleanup: Error stopping AudioRecord: ${e.message}", e)
             }
-            audioRecord = null
-            recordingThread = null
-            job?.cancel()
-            Log.d("ShazamKit", "cleanup: Cleanup completed")
         } else {
             Log.d("ShazamKit", "cleanup: AudioRecord was null, nothing to stop")
         }
+
+        // Null session last — prevents GC finalization of native resources during cleanup
+        currentSession = null
+        job?.cancel()
+        Log.d("ShazamKit", "cleanup: Cleanup completed")
     }
 
     fun stopShazamListening(promise: Promise) {
