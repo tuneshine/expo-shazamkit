@@ -2,7 +2,10 @@
   "extends": "expo-module-scripts/tsconfig.plugin",
   "compilerOptions": {
     "outDir": "build",
-    "rootDir": "src"
+    "rootDir": "src",
+    // withShazamKit.ts uses `require`. TypeScript 6 no longer pulls @types/node in
+    // automatically, so it has to be requested explicitly or the build fails TS2591.
+    "types": ["node"]
   },
   "include": ["./src"],
   "exclude": ["**/__mocks__/*", "**/__tests__/*"]
