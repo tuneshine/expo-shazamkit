@@ -5,7 +5,9 @@ public class ShazamKitModule: Module, ResultHandler {
     private let session = SHSession()
     private var delegate: ShazamDelegate?
 
-    private let audioEngine = AVAudioEngine()
+    // Replaced on every listen (see startEngine), so a var.
+    private var audioEngine = AVAudioEngine()
+    private var tapInstalled = false
 
     private var pendingPromise: Promise?
 
@@ -122,11 +124,11 @@ public class ShazamKitModule: Module, ResultHandler {
                 return
             }
             do {
-                try self.installInputTap()
-                try self.audioEngine.start()
+                try self.startEngine(audioSession)
             } catch let error as Exception {
                 self.rejectPending(error)
             } catch {
+                NSLog("[ExpoShazamKit] could not start listening: \(error)")
                 self.rejectPending(FailedToStartAudioEngine())
             }
         }
@@ -149,22 +151,64 @@ public class ShazamKitModule: Module, ResultHandler {
     // iPhones routed to the speaker or an external output) it went to the
     // speaker and fed back. A tap on the input node needs no output
     // connection, so nothing is ever played.
-    //
-    // The tap is reinstalled on every listen with the input's current format:
-    // the input device (and with it the sample rate) can change between
-    // listens, and a tap whose format no longer matches the hardware raises.
-    private func installInputTap() throws {
-        let inputNode = audioEngine.inputNode
-        inputNode.removeTap(onBus: 0)
+    private func startEngine(_ audioSession: AVAudioSession) throws {
+        // An iPhone app on a Mac only gets a microphone in its audio device
+        // once the session is active; on iPhone, starting the engine activates
+        // it implicitly, so this changes nothing there.
+        try audioSession.setActive(true)
 
-        let format = inputNode.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
+        var format = freshInputFormat()
+        logAudioState(audioSession, format: format, attempt: 1)
+
+        if !isValid(format), let mic = preferredMic(audioSession) {
+            try audioSession.setPreferredInput(mic)
+            format = freshInputFormat()
+            logAudioState(audioSession, format: format, attempt: 2)
+        }
+
+        guard isValid(format) else {
             throw NoAudioInputException()
         }
 
-        inputNode.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, audioTime in
+        audioEngine.inputNode.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, audioTime in
             self?.addAudio(buffer: buffer, audioTime: audioTime)
         }
+        tapInstalled = true
+        audioEngine.prepare()
+        try audioEngine.start()
+    }
+
+    // A new engine per listen: an engine builds its I/O unit the first time
+    // its input node is touched and keeps it, so one created before the mic
+    // was available (or before the input device changed) never sees the mic.
+    private func freshInputFormat() -> AVAudioFormat {
+        if tapInstalled {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            tapInstalled = false
+        }
+        audioEngine.stop()
+        audioEngine = AVAudioEngine()
+        return audioEngine.inputNode.outputFormat(forBus: 0)
+    }
+
+    private func isValid(_ format: AVAudioFormat) -> Bool {
+        format.sampleRate > 0 && format.channelCount > 0
+    }
+
+    private func preferredMic(_ audioSession: AVAudioSession) -> AVAudioSessionPortDescription? {
+        let inputs = audioSession.availableInputs ?? []
+        return inputs.first { $0.portType == .builtInMic } ?? inputs.first
+    }
+
+    private func logAudioState(_ audioSession: AVAudioSession, format: AVAudioFormat, attempt: Int) {
+        let route = audioSession.currentRoute
+        let available = (audioSession.availableInputs ?? []).map { "\($0.portName) [\($0.portType.rawValue)]" }
+        NSLog(
+            "[ExpoShazamKit] attempt \(attempt): format=\(format.sampleRate) Hz/\(format.channelCount) ch, "
+                + "category=\(audioSession.category.rawValue), inputAvailable=\(audioSession.isInputAvailable), "
+                + "routeInputs=\(route.inputs.map { $0.portName }), routeOutputs=\(route.outputs.map { $0.portName }), "
+                + "availableInputs=\(available), iOSAppOnMac=\(ProcessInfo.processInfo.isiOSAppOnMac)"
+        )
     }
 
     private func addAudio(buffer: AVAudioPCMBuffer, audioTime: AVAudioTime) {
