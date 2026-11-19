@@ -17,3 +17,15 @@ internal class FailedToStartAudioEngine: Exception {
     "Audio engine could not be started. Try again"
   }
 }
+
+internal class MicrophonePermissionDeniedException: Exception {
+  override var reason: String {
+    "Microphone access was not granted"
+  }
+}
+
+internal class NoAudioInputException: Exception {
+  override var reason: String {
+    "No microphone input is available"
+  }
+}

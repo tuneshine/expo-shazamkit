@@ -10,7 +10,6 @@ public class ShazamKitModule: Module, ResultHandler {
     private var pendingPromise: Promise?
 
     private var latestResults = [SHMediaItem]()
-    private var isAudioConfigured = false
 
     public func definition() -> ModuleDefinition {
         Name("ExpoShazamKit")
@@ -111,20 +110,32 @@ public class ShazamKitModule: Module, ResultHandler {
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.playAndRecord)
 
-        if !isAudioConfigured {
-            configureAudioEngine()
-            isAudioConfigured = true
-        }
-
-        audioSession.requestRecordPermission { [weak self] success in
-            guard success, let self else { return }
+        // Ask for the mic before touching the input node. Until access is
+        // granted the input can report an empty format (0 Hz, 0 channels;
+        // always the case for an iPhone app on a Mac), and AVAudioEngine
+        // raises an Objective-C exception for that, which Swift cannot catch:
+        // the app aborts.
+        audioSession.requestRecordPermission { [weak self] granted in
+            guard let self else { return }
+            guard granted else {
+                self.rejectPending(MicrophonePermissionDeniedException())
+                return
+            }
             do {
+                try self.installInputTap()
                 try self.audioEngine.start()
+            } catch let error as Exception {
+                self.rejectPending(error)
             } catch {
-                self.pendingPromise?.reject(FailedToStartAudioEngine())
-                self.pendingPromise = nil
+                self.rejectPending(FailedToStartAudioEngine())
             }
         }
+    }
+
+    private func rejectPending(_ exception: Exception) {
+        audioEngine.stop()
+        pendingPromise?.reject(exception)
+        pendingPromise = nil
     }
 
     private func stopListening() {
@@ -132,15 +143,24 @@ public class ShazamKitModule: Module, ResultHandler {
         pendingPromise = nil
     }
 
-    private func configureAudioEngine() {
-        // Tap the mic directly. The old graph routed input -> mixer -> outputNode,
-        // which played the microphone back out of the device. On iPhone that went
-        // to the earpiece (barely audible); on devices without one (iPad, Mac,
-        // and iPhones routed to the speaker or an external output) it went to the
-        // speaker and fed back. A tap on the input node needs no output
-        // connection, so nothing is ever played.
+    // Tap the mic directly. The old graph routed input -> mixer -> outputNode,
+    // which played the microphone back out of the device. On iPhone that went
+    // to the earpiece (barely audible); on devices without one (iPad, Mac, and
+    // iPhones routed to the speaker or an external output) it went to the
+    // speaker and fed back. A tap on the input node needs no output
+    // connection, so nothing is ever played.
+    //
+    // The tap is reinstalled on every listen with the input's current format:
+    // the input device (and with it the sample rate) can change between
+    // listens, and a tap whose format no longer matches the hardware raises.
+    private func installInputTap() throws {
         let inputNode = audioEngine.inputNode
+        inputNode.removeTap(onBus: 0)
+
         let format = inputNode.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            throw NoAudioInputException()
+        }
 
         inputNode.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, audioTime in
             self?.addAudio(buffer: buffer, audioTime: audioTime)
