@@ -6,7 +6,6 @@ public class ShazamKitModule: Module, ResultHandler {
     private var delegate: ShazamDelegate?
 
     private let audioEngine = AVAudioEngine()
-    private let mixerNode = AVAudioMixerNode()
 
     private var pendingPromise: Promise?
 
@@ -134,16 +133,17 @@ public class ShazamKitModule: Module, ResultHandler {
     }
 
     private func configureAudioEngine() {
-        let inputFormat = audioEngine.inputNode.inputFormat(forBus: 0)
-        let outputFormat = AVAudioFormat(standardFormatWithSampleRate: inputFormat.sampleRate, channels: 1)
+        // Tap the mic directly. The old graph routed input -> mixer -> outputNode,
+        // which played the microphone back out of the device. On iPhone that went
+        // to the earpiece (barely audible); on devices without one (iPad, Mac,
+        // and iPhones routed to the speaker or an external output) it went to the
+        // speaker and fed back. A tap on the input node needs no output
+        // connection, so nothing is ever played.
+        let inputNode = audioEngine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
 
-        audioEngine.attach(mixerNode)
-
-        audioEngine.connect(audioEngine.inputNode, to: mixerNode, format: inputFormat)
-        audioEngine.connect(mixerNode, to: audioEngine.outputNode, format: outputFormat)
-
-        mixerNode.installTap(onBus: 0, bufferSize: 2048, format: outputFormat) { buffer, audioTime in
-            self.addAudio(buffer: buffer, audioTime: audioTime)
+        inputNode.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, audioTime in
+            self?.addAudio(buffer: buffer, audioTime: audioTime)
         }
     }
 
